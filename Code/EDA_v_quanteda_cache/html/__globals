@@ -1,0 +1,7 @@
+initialize	rm	ls	library	caret	glmnet	rpart	rpart.plot	DataExplorer	tidyverse	kableExtra	flextable	data.table	pROC	scales	stats	gridExtra	mice	VIM	fastDummies	quanteda	readtext	set.seed	thresh_1	thresh_2	thresh_3	big_n	small_n
+make_samples	file_path	setwd	data_twit	read.table	big_n	sample_n	small_n	colnames	c	data_blog	data_news	write.table	F
+get_data	my_tf	readtext	my_corp	corpus	summary
+preprocess	my_dfm	dfm	my_corp	stopwords
+eda_1	dd	topfeatures	my_dfm	textplot_wordcloud	brewer.pal
+eda_2	toks	my_corp	%>%	tokens	tokens_tolower	tokens_remove	c	stopwords	tok_2	tokens_ngrams	head	str	dfm_2	dfm	topfeatures	textplot_wordcloud	brewer.pal
+eda_3	tok_3	tokens_ngrams	toks	head	dfm_3	dfm	topfeatures	textplot_wordcloud	brewer.pal

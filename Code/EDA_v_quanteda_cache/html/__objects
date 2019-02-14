@@ -1,0 +1,7 @@
+initialize	big_n	small_n	thresh_1	thresh_2	thresh_3	.Random.seed
+make_samples	data_blog	data_news	data_twit	file_path
+get_data	my_corp	my_tf
+preprocess	my_dfm
+eda_1	dd
+eda_2	dfm_2	tok_2	toks
+eda_3	dfm_3	tok_3

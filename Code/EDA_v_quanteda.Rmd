@@ -1,0 +1,223 @@
+---
+title: "Corpora EDA - q"
+author: "wnm"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+output:
+  html_document: default
+---
+
+```{r setup, echo = FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,
+	message = FALSE,
+	warning = FALSE,
+	cache = TRUE,
+	tidy = TRUE,
+  autodep = TRUE
+)
+
+knitr::opts_knit$set(root.dir = '/Users/werlindo/Dropbox/Coursera/10. Capstone')
+
+options(knitr.duplicate.label = 'allow')
+options(java.parameters = "-Xmx2048m") # for RWeka, increase heap size
+```
+
+## Data
+```{r initialize}
+rm( list = ls() )
+
+# commonly used libraries
+library(caret)        # ML 
+library(glmnet)       # regressions
+library(rpart)        # decision trees
+library(rpart.plot)   # tree plotting
+library(DataExplorer) # EDA 
+library(tidyverse)    # tidy data and plots
+library(kableExtra)   # pretty tables
+library(flextable)    # pretty tables for word docs
+library(data.table)   # data handling
+library(pROC)         # ROC plots and metrics
+library(scales)       # scaling and other helpers
+library(stats)        # AIC/BIC
+library(gridExtra)    # Gridded plots
+library(glmnet)       # glms, ridge, lasso, enet
+library(mice)         # imputation
+library(VIM)          # viz missing data
+library(fastDummies)  # fast binarizers - using dummy_cols
+
+# Text Mining
+# library(tm)
+# library(qdap)
+# library(RWeka)
+# library(NLP)
+# library(SnowballC)
+# library(wordcloud)
+library(quanteda)
+library(readtext)
+
+# Set seed for reproducibility
+set.seed(2425)
+
+### Other Initializations
+# Set classification thresholds  
+thresh_1 <- .50  
+thresh_2 <- .75  
+thresh_3 <- .90  
+
+big_n = 30000
+small_n = 100
+```
+
+
+```{r make_samples}
+# Mac
+file_path <-"/Users/Werlindo/Dropbox/Coursera/10. Capstone/Data/Files/en_US/orig"
+
+setwd( file_path )
+
+# Sample first n of each file
+data_twit <- read.table( 'en_US.twitter.txt',sep='\t', nrows = big_n )
+data_twit <- sample_n( data_twit, small_n )
+colnames(data_twit) <- c( "text" )
+
+# df_twit <- data.frame( doc_id = seq(1,nn), text = data_twit$V1 )
+# df_twit <- data.frame( text = data_twit$V1 )
+# df_twit %>% 
+  # map_if( is.factor, as.character ) %>%
+  # as_data_frame -> df_twit
+# str(df_twit)
+
+# colnames(df_twit)
+
+data_blog <- read.table( 'en_US.blogs.txt',sep='\t', nrows = big_n )
+data_blog <- sample_n( data_blog, small_n )
+colnames(data_blog) <- c( "text" )
+# df_blog <- data.frame( doc_id = seq(1,nn), text = data_blog$V1 )
+# df_blog %>% 
+#   map_if( is.factor, as.character ) %>%
+#   as_data_frame -> df_blog
+# str(df_blog)
+
+data_news <- read.table( 'en_US.news.txt',sep='\t', nrows = big_n )
+data_news <- sample_n( data_news, small_n )
+colnames(data_news) <- c( "text" )
+# df_news <- data.frame( doc_id = seq(1,nn), text = data_news$V1 )
+# df_news %>% 
+#   map_if( is.factor, as.character ) %>%
+#   as_data_frame -> df_news
+# str(df_news)
+
+file_path <-"/Users/Werlindo/Dropbox/Coursera/10. Capstone/Data/Files/en_US/samples"
+# file.path <-"./Data/Files/en_US/"
+setwd( file_path )
+# ?sample
+
+# Write out the 1K sample files
+write.table( data_twit, file = "sample_twit.txt", row.names = F, quote = F  )
+write.table( data_blog, file = "sample_blog.txt", row.names = F, quote = F  )
+write.table( data_news, file = "sample_news.txt", row.names = F, quote = F  )
+```
+
+
+```{r get_data}
+# Mac
+my_tf <- readtext( "/Users/Werlindo/Dropbox/Coursera/10. Capstone/Data/Files/en_US/samples/*")
+# summary(my_tf)
+
+#Create corpus
+my_corp <- corpus( my_tf )
+summary(my_corp)
+
+
+# corp_twit_sample <- corpus_sample( my_corp, 1 )
+# summary(corp_twit_sample)
+
+# summary( corpus ( my_tf ) )
+# ?corpus_sample
+```
+
+#### Create corpus preprocessing function
+```{r preprocess}
+# make a dfm
+my_dfm <- dfm( my_corp
+               ,remove = stopwords("english") 
+               # ,stem = TRUE
+               ,remove_punct = TRUE 
+               )
+
+# Take a look
+my_dfm[,1:2]
+
+```
+
+#### Take a look at frequency, unigram
+```{r eda_1}
+# Top 20 
+dd <- topfeatures( my_dfm, 20 )
+dd
+
+# Wordcloud
+textplot_wordcloud( my_dfm
+                    ,min_count = 10
+                    ,max_words = 30
+                    ,random_order = FALSE
+                    ,rotation = .25
+                    ,color = RColorBrewer::brewer.pal( 8, "Dark2" )
+)
+
+
+```
+
+```{r eda_2}
+# How about bigrams?
+toks <- my_corp %>%
+  tokens( remove_punct = TRUE
+          ,remove_numbers = TRUE
+          ,remove_symbols = TRUE
+          ,remove_twitter = TRUE
+          ,remove_url = TRUE
+          ,remove_hyphens = TRUE
+        ) %>%
+  tokens_tolower()  %>%
+  tokens_remove( c( stopwords("english"), "ass" ) )  
+
+tok_2 <- tokens_ngrams( toks, n = 2 )
+
+head( tok_2[[1]] )
+str(tok_2)
+dfm_2 <- dfm( tok_2 )
+
+# Top 20
+topfeatures( dfm_2, 20 )
+
+# Wordcloud
+textplot_wordcloud( dfm_2
+                    ,min_count = 1
+                    ,max_words = 30
+                    ,random_order = FALSE
+                    ,rotation = .25
+                    ,color = RColorBrewer::brewer.pal( 8, "Dark2" )
+)
+
+```
+
+```{r eda_3}
+tok_3 <- tokens_ngrams( toks, n = 3 )
+
+head( tok_3[[1]] )
+
+dfm_3 <- dfm( tok_3 )
+
+# Top 20
+topfeatures( dfm_3, 20 )
+
+# Wordcloud
+textplot_wordcloud( dfm_3
+                    ,min_count = 1
+                    ,max_words = 30
+                    ,random_order = FALSE
+                    ,rotation = .25
+                    ,color = RColorBrewer::brewer.pal( 8, "Dark2" )
+)
+
+```
