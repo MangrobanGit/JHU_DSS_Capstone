@@ -33,5 +33,5 @@
 "0","thresh_1 <- .50  "
 "0","thresh_2 <- .75  "
 "0","thresh_3 <- .90  "
-"0","big_n = 30000"
-"0","small_n = 100"
+"0","big_n = 30000 # Number of rows pulled from file. These are sequential"
+"0","small_n = 2000 # of rows sampled from the initial row pull"

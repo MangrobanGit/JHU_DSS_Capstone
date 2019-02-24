@@ -1,0 +1,183 @@
+---
+title: "Corpora EDA"
+author: "wnm"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+output:
+  html_document: default
+---
+
+```{r setup, echo = FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,
+	message = FALSE,
+	warning = FALSE,
+	cache = TRUE,
+	tidy = TRUE
+)
+
+knitr::opts_knit$set(root.dir = '/Users/werlindo/Dropbox/Coursera/10. Capstone')
+
+options(knitr.duplicate.label = 'allow')
+options(java.parameters = "-Xmx2048m") # for RWeka, increase heap size
+```
+
+## Data
+
+```{r initialize}
+rm( list = ls() )
+
+# commonly used libraries
+library(caret)        # ML 
+library(glmnet)       # regressions
+library(rpart)        # decision trees
+library(rpart.plot)   # tree plotting
+library(DataExplorer) # EDA 
+library(tidyverse)    # tidy data and plots
+library(kableExtra)   # pretty tables
+library(flextable)    # pretty tables for word docs
+library(data.table)   # data handling
+library(pROC)         # ROC plots and metrics
+library(scales)       # scaling and other helpers
+library(stats)        # AIC/BIC
+library(gridExtra)    # Gridded plots
+library(glmnet)       # glms, ridge, lasso, enet
+library(mice)         # imputation
+library(VIM)          # viz missing data
+library(fastDummies)  # fast binarizers - using dummy_cols
+
+# Text Mining
+library(tm)
+library(qdap)
+library(RWeka)
+library(NLP)
+library(SnowballC)
+library(wordcloud)
+
+
+# Set seed for reproducibility
+set.seed(2425)
+
+### Other Initializations
+# Set classification thresholds  
+thresh_1 <- .50  
+thresh_2 <- .75  
+thresh_3 <- .90  
+```
+
+```{r quanteda_tut}
+my_corpus <- corpus(data_char_ukimmig2010)  # build a new corpus from the texts
+summary(my_corpus)
+```
+
+
+```{r get_data}
+### Get files, put into VCorpus
+
+### Windows
+tweets <- VCorpus(DirSource("D:/Dropbox/Coursera/10. Capstone/Data/Files/en_US/twitter only"))
+
+### Mac
+# tweets <- VCorpus(DirSource("/Users/Werlindo/Dropbox/Coursera/10. Capstone/Data/Files/en_US/twitter only"))
+
+```
+
+
+#### Create corpus preprocessing function
+```{r preproc_func}
+# Alter the function code to match the instructions
+clean_corpus <- function(corpus){
+  
+  # Remove white space
+  corpus <- tm_map(corpus, stripWhitespace)
+
+  # Make all lowercase
+  corpus <- tm_map(corpus, content_transformer(tolower))
+
+  # Remove any stopwords
+  corpus <- tm_map(corpus, removeWords,stopwords("english"))
+  # corpus <- tm_map(corpus, removeWords, c(stopwords("en"), "coffee", "mug"))
+
+  corpus <- tm_map(corpus, removePunctuation)
+  
+  # Create plain text document
+  corpus <- tm_map(corpus, PlainTextDocument)
+
+  return(corpus)
+}
+```
+
+#### Create tokenizer function
+```{r tok}
+tok_tweets_bi_tri <- function(x){
+  NGramTokenizer( x
+                  ,Weka_control( min = 2
+                                 ,max = 3 ) )  
+} 
+```
+
+#### Process the tweets dataset
+```{r clean_tweets}
+# Clean tweets
+tweets_clean <- clean_corpus( tweets )
+
+# Put into a tdm
+tdm_tweets <- TermDocumentMatrix( tweets_clean
+                                  ,control = list( tokenize = tok_tweets_bi_tri ) )
+
+
+rm(tweets_freq)
+rm(tweets_term)
+rm(tweets_df)
+
+tweets_DT <- tdm_tweets %>% 
+  as.matrix %>%
+  rowSums %>%
+  as.list %>% 
+  unlist %>%
+  data.frame( stringsAsFactors = FALSE ) %>%
+  setDT( keep.rowname =TRUE ) %>%
+  setnames( 1, "term" ) %>%
+  setnames( 2, "freq" )
+#   
+#   
+# # Create vectors
+# tweets_freq <- rowSums(as.matrix(tdm_tweets))
+# tweets_term <- as.list(tweets_freq)
+# 
+# # set dt
+# tweets_df <- data.frame(unlist(tweets_freq), stringsAsFactors = FALSE)
+# 
+# 
+# setDT(tweets2, keep.rowname =TRUE)
+# 
+# setnames(tweets2, 1, "term")
+# setnames(tweets2, 2, "freq")
+
+
+```
+
+```{r export}
+# write_csv( tweets_DT
+#            ,'D:/Dropbox/Coursera/10. Capstone/Data/_Processed/tweets_cleaned_bi_tri.csv')
+write_csv( tweets_DT
+           ,'/Users/Werlindo/Dropbox/Coursera/10. Capstone/Data/_Processed/tweets_cleaned_bi_tri.csv')
+  
+### Windows
+tweets <- VCorpus(DirSource("D:/Dropbox/Coursera/10. Capstone/Data/Files/en_US/twitter only"))
+
+```
+
+
+```{r word_cloud}
+# Get top 30
+tweets_top_30 <- head(arrange( tweets_DT
+                               , desc( freq ) )
+                               , n = 30 )
+
+# Create a wordcloud for the values in word_freqs
+wordcloud( tweets_top_30$term
+           ,tweets_top_30$freq
+           ,max.words = 50
+           ,colors = "turquoise" )
+```
+

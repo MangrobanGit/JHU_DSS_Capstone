@@ -1,0 +1,12 @@
+"0","# Wordcloud
+textplot_wordcloud( my_dfm
+                    ,min_count = 10
+                    ,max_words = 30
+                    ,random_order = FALSE
+                    ,rotation = .25
+                    ,color = RColorBrewer::brewer.pal( 8, ""Dark2"" )
+)
+"
+"2","Error in textplot_wordcloud(my_dfm, min_count = 10, max_words = 30, random_order = FALSE,  : 
+  object 'my_dfm' not found
+"

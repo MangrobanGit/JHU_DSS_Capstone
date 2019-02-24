@@ -1,0 +1,671 @@
+---
+title: "Corpora EDA"
+author: "wnm"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+output:
+  html_document: default
+---
+
+```{r setup, echo = FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,
+	message = FALSE,
+	warning = FALSE,
+	cache = TRUE,
+	tidy = TRUE
+)
+
+knitr::opts_knit$set(root.dir = '/Users/werlindo/Dropbox/Coursera/10. Capstone')
+
+options(knitr.duplicate.label = 'allow')
+```
+
+## Data
+
+```{r initialize}
+rm( list = ls() )
+# commonly used libraries
+library(caret)        # ML 
+library(glmnet)       # regressions
+library(rpart)        # decision trees
+library(rpart.plot)   # tree plotting
+library(DataExplorer) # EDA 
+library(tidyverse)    # tidy data and plots
+library(kableExtra)   # pretty tables
+library(flextable)    # pretty tables for word docs
+library(data.table)   # data handling
+library(pROC)         # ROC plots and metrics
+library(scales)       # scaling and other helpers
+library(stats)        # AIC/BIC
+library(gridExtra)    # Gridded plots
+library(glmnet)       # glms, ridge, lasso, enet
+library(mice)         # imputation
+library(VIM)          # viz missing data
+library(fastDummies)  # fast binarizers - using dummy_cols
+
+# Text Mining
+library(tm)
+library(qdap)
+library(RWeka)
+library(NLP)
+library(SnowballC)
+
+# Set seed for reproducibility
+set.seed(2425)
+
+### Other Initializations
+# Set classification thresholds  
+thresh_1 <- .50  
+thresh_2 <- .75  
+thresh_3 <- .90  
+```
+
+
+#### Get Data
+```{r get_data}
+getwd()
+# file.path <-"/Users/werlindo/Dropbox/Coursera/10. Capstone/Data/Files/en_US/"
+file.path <-"D:/Dropbox/Coursera/10. Capstone/Data/Files/en_US/"
+# file.path <-"./Data/Files/en_US/"
+setwd( file.path )
+# getwd()
+file.path
+# dir()
+
+# Look at one of the tables
+data_twit <- read.table( 'en_US.twitter.txt',sep='\t', nrows = 100 )
+data_blog <- read.table( 'en_US.blogs.txt',sep='\t', nrows = 100 )
+
+head(data_twit)
+head(data_blog)
+str(data_blog)
+```
+
+#### Miscellaneous Tasks
+
+1) Reading in lines.
+
+```{r read_lines}
+# file.path <-"./Data/Files/en_US/"
+file.path <-"D:/Dropbox/Coursera/10. Capstone/Data/Files/en_US/"
+setwd( file.path )      
+getwd()
+con <- file("en_US.twitter.txt", "r") 
+
+readLines(con, 1) ## Read the first line of text 
+
+readLines(con, 1) ## Read the next line of text 
+
+readLines(con, 5) ## Read in the next 5 lines of text 
+
+close(con)  ## It's important to close the connection when you are done
+```
+
+2) Determine how many lines in en_US.twitter.txt
+
+```{r lines_twit}
+# file.path <-"./Data/Files/en_US/"
+file.path <-"D:/Dropbox/Coursera/10. Capstone/Data/Files/en_US/"
+setwd( file.path )      
+
+conn <- file("en_US.twitter.txt",open="r")
+read.size.of <- 20000
+num.lines <- 0
+while ( (lines.read <- length( readLines( conn, read.size.of ) ) ) > 0 ) {
+      num.lines <- num.lines + lines.read
+}
+close( conn )
+
+num.lines
+#2360148
+```
+
+
+3) Get longest line out of all en_US files
+
+```{r longest_en}
+# file.path <-"./Data/Files/en_US/"
+file.path <-"D:/Dropbox/Coursera/10. Capstone/Data/Files/en_US/"
+setwd( file.path )      
+
+# Final version
+files <- dir()
+
+file.name <- character()
+maxes <- numeric()
+res <- data.frame( file.name, maxes )
+
+ctr <- 1
+
+for ( curr_file in files ){
+  conn <- file(curr_file,open="r")
+  longest = 0
+  
+  while ( TRUE ) {
+        curr <- nchar( readLines( conn, 1 ) )
+        longest <- max( longest, curr  ) 
+        if ( length(curr) == 0 ) {
+          print( 'Done!' )
+          break
+        }
+  }
+  close( conn )
+
+  #Record results
+  res <- rbind( data.frame( curr_file, longest ), res )
+}
+
+res
+```
+
+In the en_US twitter data set, if you divide the number of lines where the word "love" 
+(all lowercase) occurs by the number of lines the word "hate" (all lowercase) occurs, 
+about what do you get?
+
+```{r love_hate}
+# file.path <-"./Data/Files/en_US/"
+file.path <-"D:/Dropbox/Coursera/10. Capstone/Data/Files/en_US/"
+setwd( file.path )      
+
+conn <- file("en_US.twitter.txt",open="r")
+love = 0
+hate = 0
+
+# count 'love' 
+while ( TRUE ) {
+      # print( nchar( readLines( conn, 1 ) ) )
+      curr <- readLines( conn, 1 )
+      # print(curr)
+      if ( length(curr) == 0 ) {
+            print( 'Done!' )
+            break
+      }     
+      love <-( grepl( 'love', curr  ) * 1 ) + love 
+
+}
+close( conn )
+love
+#90956
+
+# count 'hate' 
+conn <- file("en_US.twitter.txt",open="r")
+while ( TRUE ) {
+      # print( nchar( readLines( conn, 1 ) ) )
+      curr <- readLines( conn, 1 )
+      # print(curr)
+      if ( length(curr) == 0 ) {
+            print( 'Done!' )
+            break
+      }     
+      hate <-( grepl( 'hate', curr  ) * 1 ) + hate 
+      
+}
+close( conn )
+hate
+#22138
+
+love/hate
+# 4.108592
+
+```
+
+The one tweet in the en_US twitter data set that matches the word "biostats"says what?
+
+```{r biostats}
+# file.path <-"./Data/Files/en_US/"
+file.path <-"D:/Dropbox/Coursera/10. Capstone/Data/Files/en_US/"
+setwd( file.path )      
+
+conn <- file("en_US.twitter.txt",open="r")
+while ( TRUE ) {
+      # print( nchar( readLines( conn, 1 ) ) )
+      curr <- readLines( conn, 1 )
+
+      if ( length(curr) == 0 ) {
+            print( 'Done!' )
+            break
+      }       
+      if ( grepl( 'biostats', curr  ) ) {
+            found.it <- curr
+      }     
+
+}
+close( conn )
+found.it
+```
+
+How many tweets have the exact characters "A computer once beat me at
+chess, but it was no match for me at kickboxing". 
+(I.e. the line matches those characters exactly.)
+
+```{r kickbox}
+ctr = 0 
+
+# file.path <-"./Data/Files/en_US/"
+file.path <-"D:/Dropbox/Coursera/10. Capstone/Data/Files/en_US/"
+setwd( file.path )      
+conn <- file("en_US.twitter.txt",open="r")
+
+while ( TRUE ) {
+      # print( nchar( readLines( conn, 1 ) ) )
+      curr <- readLines( conn, 1 )
+      if ( length(curr) == 0 ) {
+            print( 'Done!' )
+            break
+      }       
+      if ( grepl( 'A computer once beat me at chess, but it was no match for me at kickboxing', curr  ) ) {
+            ctr = ctr + 1
+      }     
+
+}
+close( conn )
+ctr
+#3
+
+
+```
+
+---
+
+### Apply text mining lessons
+
+Let's try to build a corpora based on tweets file
+```{r tm_tweets1}
+
+# file.path <-"./Data/Files/en_US/"
+file.path <-"D:/Dropbox/Coursera/10. Capstone/Data/Files/en_US/"
+setwd( file.path )      
+
+# Look at one of the tables
+data_twit <- read.table( 'en_US.twitter.txt',sep='\t' )
+# data_blog <- read.table( 'en_US.blogs.txt',sep='\t', nrows = 100 )
+
+dim(data_twit)
+class(data_twit)
+head(data_twit)
+# head(data_blog)
+```
+
+#### For testing, make a small sample
+
+```{r tm_tweets1_mini}
+sample_n <- 1000
+
+doc_id <- seq(1,sample_n)
+text <- enc2utf8(as.character( data_twit[sample(nrow(data_twit), sample_n), ]))
+
+mini_data_twit <- data.frame(doc_id = doc_id, text = text )
+str(mini_data_twit)
+head(mini_data_twit$text,20)
+
+```
+
+
+#### Make a VCorpus from a data frame
+```{r}
+# Create a DataframeSource: df_source
+df_source <- DataframeSource(mini_data_twit)
+
+# Convert df_source to a corpus: df_corpus
+df_corpus <- VCorpus(df_source)
+
+# Examine df_corpus
+df_corpus
+
+# Examine df_corpus metadata
+meta(df_corpus)
+
+# # Compare the number of documents in the vector source
+# vec_corpus
+# 
+# # Compare metadata in the vector corpus
+# meta(vec_corpus)
+```
+
+#### Apply preprocessing steps to a corpus
+```{r}
+# Alter the function code to match the instructions
+clean_corpus <- function(corpus){
+  corpus <- tm_map(corpus, removePunctuation)
+  corpus <- tm_map(corpus, content_transformer(tolower))
+  corpus <- tm_map(corpus, stripWhitespace)
+  # corpus <- tm_map(corpus, removeWords, c(stopwords("en"), "coffee", "mug"))
+  return(corpus)
+}
+
+# Apply your customized function to the tweet_corp: clean_corp
+clean_corp <- clean_corpus(df_corpus)
+
+### Check removePunctation
+# Print out a cleaned up tweet
+clean_corp[[2]][1]
+# Print out the same tweet in original form
+mini_data_twit$text[2]
+
+### Check tolower
+# Print out a cleaned up tweet
+clean_corp[[8]][1]
+# Print out the same tweet in original form
+mini_data_twit$text[8]
+
+### Check stripWhitespace
+# Print out a cleaned up tweet
+clean_corp[[2]][1]
+# Print out the same tweet in original form
+mini_data_twit$text[2]
+
+```
+
+#### Try Cleaning with qdap
+
+```{r clean_corp_qdap}
+# Alter the function code to match the instructions
+clean_corpus_qdap <- function(corpus){
+  # Remove text within brackets
+  corpus <- tm_map(corpus, bracketX)
+
+  # Replace numbers with words
+  corpus <- tm_map(corpus, replace_number)
+
+  # Replace abbreviations
+  corpus <- tm_map(corpus, replace_abbreviation)
+
+  # Replace contractions
+  corpus <- tm_map(corpus, replace_contraction)
+
+  # Replace symbols with words
+  corpus <- tm_map(corpus, replace_symbol)
+  return(corpus)
+}
+
+# Apply your customized function to the tweet_corp: clean_corp
+clean_corp_q <- clean_corpus_qdap(df_corpus)
+
+# Print out a cleaned up tweet (numbers with words)
+clean_corp_q[[29]][1]
+# Print out the same tweet in original form
+mini_data_twit$text[29]
+```
+
+### Super cleaning 
+```{r clean_corp_mega}
+clean_corpus_mega <- function(corpus){
+  
+  corpus <- tm_map(corpus, removePunctuation)
+  corpus <- tm_map(corpus, content_transformer(tolower))
+  corpus <- tm_map(corpus, stripWhitespace)
+  corpus <- tm_map(corpus, removeWords, stopwords("en") )
+
+  # Remove text within brackets
+  # corpus <- tm_map(corpus, bracketX)
+  corpus <- tm_map(corpus, content_transformer(bracketX))
+
+  # Replace numbers with words
+  # corpus <- tm_map(corpus, replace_number)
+  # corpus <- tm_map(corpus, content_transformer(replace_number))
+
+  # Replace abbreviations
+  corpus <- tm_map(corpus, content_transformer(replace_abbreviation))
+  # corpus <- tm_map(corpus, replace_abbreviation)
+
+  # Replace contractions
+  corpus <- tm_map(corpus, content_transformer(replace_contraction))
+  # corpus <- tm_map(corpus, replace_contraction)
+
+  # Replace symbols with words
+  corpus <- tm_map(corpus, content_transformer(replace_symbol))
+  # corpus <- tm_map(corpus, replace_symbol)
+
+  return(corpus)  
+}
+
+# Apply your customized function to the tweet_corp: clean_corp
+clean_corp_use <- clean_corpus_mega(df_corpus)
+
+# Create a TDM from clean_corp_use
+twit_tdm <- TermDocumentMatrix( clean_corp_use )
+
+```
+
+```{r bleh}
+### Check removePunctation
+# Print out a cleaned up tweet
+clean_corp_use[[2]][1]
+# Print out the same tweet in original form
+mini_data_twit$text[2]
+
+# Print out a cleaned up tweet (numbers with words)
+clean_corp_use[[29]][1]
+# Print out the same tweet in original form
+mini_data_twit$text[29]
+```
+
+```{r tdm}
+# Create a TDM from clean_corp_use
+# twit_tdm <- TermDocumentMatrix( clean_corp_use )
+
+# Print twit_tdm data
+twit_tdm
+
+# Convert coffee_tdm to a matrix: coffee_m
+twit_m <- as.matrix( twit_tdm )
+
+# Print the dimensions of the matrix
+dim( twit_m )
+
+# Review a portion of the matrix
+twit_m[2587:2590, 148:150]
+```
+
+#### Frequent terms with tm
+
+```{r}
+# Calculate the rowSums: term_frequency
+term_frequency <- rowSums( twit_m )
+
+# Sort term_frequency in descending order
+term_frequency <- sort( term_frequency, decreasing = TRUE )
+
+# View the top 10 most common words
+term_frequency[ 1:10 ]
+
+# Plot a barchart of the 10 most common words
+barplot( term_frequency[1:10], col = 'tan', las = 2 )
+
+tf_df <- term_frequency %>%
+  as.list() %>%
+  data.frame() %>%
+  melt()
+
+f <- ggplot( tf_df[1:10,], aes( x = variable, y = value ) ) + geom_col()
+f
+```
+
+
+#### Frequent terms with **qdap**
+```{r qdap_freq}
+# Create frequency
+frequency <-freq_terms(
+  mini_data_twit$text, 
+  top = 10, 
+  at.least = 3, 
+  stopwords = "Top200Words"
+)
+
+# Make a frequency barchart
+plot(frequency)
+
+# Now use different stopwords
+# Create frequency
+frequency <- freq_terms(
+  mini_data_twit$text
+  ,top = 10
+  ,at.least = 3
+  ,stopwords = stopwords("english")
+)
+
+# Make a frequency barchart
+plot(frequency)
+```
+
+#### A simple word cloud
+```{r word_cloud_1}
+## term_frequency is loaded into your workspace
+
+# Load wordcloud package
+library(wordcloud)
+
+# Print the first 10 entries in term_frequency
+term_frequency[1:10]
+
+# Vector of terms
+terms_vec <- names(term_frequency)
+
+# Create a wordcloud for the values in word_freqs
+wordcloud( terms_vec, term_frequency, max.words = 50, colors = "red")
+```
+
+#### Stop words and word clouds
+
+```{r}
+# Review a "cleaned" tweet
+content(clean_corp_use[[24]])
+
+# Add to stopwords
+stops <- c(stopwords(kind = 'en'), 'harrens')
+
+# Review last 6 stopwords 
+tail(stops)
+
+# Apply to a corpus
+clean_corp_use_fun <- tm_map(clean_corp_use,removeWords, stops)
+
+# Review a "cleaned" tweet again
+content(clean_corp_use_fun[[24]])
+```
+
+
+#### Plot the better word cloud
+
+```{r}
+# Sort the chardonnay_words in descending order
+sorted_tf <- sort(term_frequency, decreasing = TRUE )
+
+# Print the 6 most frequent chardonnay terms
+head( sorted_tf, 6 )
+
+# Get a terms vector
+terms_vec <- names( term_frequency )
+
+# Create a wordcloud for the values in word_freqs
+wordcloud(terms_vec, term_frequency, 
+          max.words = 50, colors = "red")
+```
+
+#### Improve word cloud colors
+
+```{r}
+# Print the list of colors
+colors()
+
+# Print the wordcloud with the specified colors
+wordcloud(terms_vec, 
+          term_frequency, 
+          max.words = 100, 
+          colors = c('grey80','darkgoldenrod1','tomato'))
+```
+
+#### Use prebuilt color palettes
+
+```{r}
+# Select 5 colors 
+library(viridis)
+color_pal <- cividis(n = 5)
+
+# Examine the palette output
+print(color_pal)
+
+# Create a wordcloud with the selected palette
+wordcloud(terms_vec
+          ,term_frequency
+          ,max.words = 100
+          ,color = color_pal)
+```
+
+###############################
+
+#### Changing n-grams
+
+```{r}
+library( RWeka )
+
+# Make tokenizer function 
+tokenizer <- function(x) {
+  NGramTokenizer(x, Weka_control(min = 2, max = 2))
+}
+
+# Create unigram_dtm
+unigram_dtm <- DocumentTermMatrix( clean_corp_use )
+
+unigram_dtm
+
+# Create bigram_dtm
+bigram_dtm <- DocumentTermMatrix( clean_corp_use
+                                  ,control = list( tokenizer = tokenizer )
+                                  )
+
+# Print unigram_dtm
+print(unigram_dt)m
+
+# Print bigram_dtm
+print(bigram_dtm)
+```
+
+
+#### How do bigrams affect word clouds?
+
+```{r}
+# Create bigram_dtm_m
+bigram_dtm_m <- as.matrix( bigram_dtm )
+
+# Create freq
+freq <- colSums( bigram_dtm_m )
+
+# Create bi_words
+bi_words <- names(freq)
+
+# Examine part of bi_words
+str_subset( bi_words, "^marvin" )
+
+# Plot a wordcloud
+wordcloud(bi_words, freq, max.words = 15)
+```
+
+```{r bi_tri}
+file.path <-"D:/Dropbox/Coursera/10. Capstone/Data/Files/en_US/twitter only"
+setwd( file.path )      
+
+# tweets <- VCorpus(DirSource("D:/Dropbox/Coursera/10. Capstone/Data/Files/en_US/twitter only"))
+tweets <- VCorpus(DirSource("/Users/Werlindo/Dropbox/Coursera/10. Capstone/Data/Files/en_US/twitter only"))
+
+tweets <- tm_map(tweets, stripWhitespace)
+tweets <- tm_map(tweets, tolower)
+tweets <- tm_map(tweets, removeWords,stopwords("english"))
+tweets <- tm_map(tweets, removeWords, c("was"))
+tweets <- tm_map(tweets, removePunctuation)
+tweets <- tm_map(tweets, PlainTextDocument)
+
+tokPromote <- function(x) NGramTokenizer(x, Weka_control(min=2, max=3))
+tdmPromote <- TermDocumentMatrix(tweets,control = list(tokenize = tokPromote))
+termFreqPromote <- rowSums(as.matrix(tdmPromote))
+termFreqVectorPromote <- as.list(termFreqPromote)
+
+tweets2 <- data.frame(unlist(termFreqVectorPromote), stringsAsFactors = FALSE)
+setDT(tweets2, keep.rowname =TRUE)
+setnames(tweets2, 1, "term")
+setnames(tweets2, 2, "freq")
+tweets3 <- head(arrange(tweets2,desc(freq)), n =30 )
+tweets3$npstype <- "tweets"
+
+```
+

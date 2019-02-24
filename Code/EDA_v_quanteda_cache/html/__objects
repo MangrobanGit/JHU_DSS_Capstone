@@ -1,4 +1,4 @@
-initialize	big_n	small_n	thresh_1	thresh_2	thresh_3	.Random.seed
+initialize	big_n	small_n	thresh_1	thresh_2	thresh_3
 make_samples	data_blog	data_news	data_twit	file_path
 get_data	my_corp	my_tf
 preprocess	my_dfm
